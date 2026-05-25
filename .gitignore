@@ -1,4 +1,15 @@
+# Python
 .venv/
 __pycache__/
 *.pyc
+
+# Nix
 .direnv/
+
+# Model checkpoints (too large for git)
+checkpoints/
+*.pt
+
+# OS / sync artifacts
+*.sync-conflict-*
+.DS_Store
