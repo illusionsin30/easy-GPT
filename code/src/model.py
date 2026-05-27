@@ -51,11 +51,16 @@ def apply_rotary_emb(xq, xk, freqs_cis):
 # ─── Causal Self-Attention with RoPE ─────────────────────────────────────────
 
 class CausalSelfAttention(nn.Module):
-    def __init__(self, dim, num_heads, max_seq_len=512, dropout=0.1):
+    def __init__(self, dim, num_heads, max_seq_len=512, dropout=0.1,
+                 use_qk_norm=False, use_attn_gate=False, use_value_emb=False,
+                 vocab_size=None):
         super().__init__()
         assert dim % num_heads == 0, f"dim {dim} must be divisible by num_heads {num_heads}"
         self.num_heads = num_heads
         self.head_dim = dim // num_heads
+        self.use_qk_norm = use_qk_norm
+        self.use_attn_gate = use_attn_gate
+        self.use_value_emb = use_value_emb
 
         self.wq = nn.Linear(dim, dim, bias=False)
         self.wk = nn.Linear(dim, dim, bias=False)
@@ -65,26 +70,52 @@ class CausalSelfAttention(nn.Module):
         self.attn_dropout = nn.Dropout(dropout)
         self.resid_dropout = nn.Dropout(dropout)
 
+        # QK Norm: per-head LayerNorm on Q and K before attention
+        if use_qk_norm:
+            self.q_norm = nn.LayerNorm(self.head_dim)
+            self.k_norm = nn.LayerNorm(self.head_dim)
+
+        # Attention Gate: learnable per-head scalar gate (SDPA Elementwise)
+        if use_attn_gate:
+            self.attn_gate = nn.Parameter(torch.zeros(1, num_heads, 1, 1))
+
+        # Value Embedding: separate embedding added to V
+        if use_value_emb:
+            assert vocab_size is not None, "vocab_size required for value_emb"
+            self.value_embedding = nn.Embedding(vocab_size, dim)
+
         # 预计算 RoPE 频率和因果掩码
         self.register_buffer('freqs_cis', precompute_freqs_cis(self.head_dim, max_seq_len))
         mask = torch.triu(torch.ones(max_seq_len, max_seq_len), diagonal=1).bool()
         self.register_buffer('mask', mask)
 
-    def forward(self, x):
+    def forward(self, x, input_ids=None):
         """
         Args:
             x: (seq_len, B, dim)
+            input_ids: (seq_len, B) optional, for value_emb variant
         Returns:
             (seq_len, B, dim)
         """
         seq_len, B, C = x.shape
 
         # 转置为 (B, seq_len, dim) 做线性投影
-        x = x.transpose(0, 1)
+        x_t = x.transpose(0, 1)
 
-        q = self.wq(x).view(B, seq_len, self.num_heads, self.head_dim)
-        k = self.wk(x).view(B, seq_len, self.num_heads, self.head_dim)
-        v = self.wv(x).view(B, seq_len, self.num_heads, self.head_dim)
+        q = self.wq(x_t).view(B, seq_len, self.num_heads, self.head_dim)
+        k = self.wk(x_t).view(B, seq_len, self.num_heads, self.head_dim)
+        v = self.wv(x_t).view(B, seq_len, self.num_heads, self.head_dim)
+
+        # Value Embedding: add separate embedding to V
+        if self.use_value_emb:
+            v_emb = self.value_embedding(input_ids.transpose(0, 1))  # (B, seq_len, dim)
+            v_emb = v_emb.view(B, seq_len, self.num_heads, self.head_dim)
+            v = v + v_emb
+
+        # QK Norm: normalize Q and K per-head before RoPE
+        if self.use_qk_norm:
+            q = self.q_norm(q)
+            k = self.k_norm(k)
 
         # RoPE: 输入形状 (B, seq_len, num_heads, head_dim)
         q, k = apply_rotary_emb(q, k, self.freqs_cis)
@@ -105,6 +136,11 @@ class CausalSelfAttention(nn.Module):
         attn = self.attn_dropout(attn)
 
         out = torch.matmul(attn, v)  # (B, H, T, head_dim)
+
+        # Attention Gate: per-head sigmoid gate (applied before head concatenation)
+        if self.use_attn_gate:
+            out = out * torch.sigmoid(self.attn_gate)
+
         out = out.transpose(1, 2).contiguous().view(B, seq_len, C)
         out = self.wo(out)
         out = self.resid_dropout(out)
@@ -136,16 +172,20 @@ class SwiGLUFFN(nn.Module):
 # ─── Transformer Block (Pre-Norm) ────────────────────────────────────────────
 
 class TransformerBlock(nn.Module):
-    def __init__(self, dim, num_heads, max_seq_len=512, ffn_hidden_dim=None, dropout=0.1):
+    def __init__(self, dim, num_heads, max_seq_len=512, ffn_hidden_dim=None, dropout=0.1,
+                 use_qk_norm=False, use_attn_gate=False, use_value_emb=False,
+                 vocab_size=None):
         super().__init__()
         self.attn_norm = nn.LayerNorm(dim)
-        self.attn = CausalSelfAttention(dim, num_heads, max_seq_len, dropout)
+        self.attn = CausalSelfAttention(dim, num_heads, max_seq_len, dropout,
+                                        use_qk_norm, use_attn_gate, use_value_emb,
+                                        vocab_size)
         self.ffn_norm = nn.LayerNorm(dim)
         self.ffn = SwiGLUFFN(dim, ffn_hidden_dim, dropout)
 
-    def forward(self, x):
+    def forward(self, x, input_ids=None):
         """Pre-norm: x + SubLayer(LayerNorm(x))"""
-        x = x + self.attn(self.attn_norm(x))
+        x = x + self.attn(self.attn_norm(x), input_ids)
         x = x + self.ffn(self.ffn_norm(x))
         return x
 
@@ -154,20 +194,26 @@ class TransformerBlock(nn.Module):
 
 class CausalLMM(nn.Module):
     def __init__(self, vocab_size, dim=256, num_layers=4, num_heads=8,
-                 max_seq_len=512, ffn_hidden_dim=None, dropout=0.1):
+                 max_seq_len=512, ffn_hidden_dim=None, dropout=0.1,
+                 use_qk_norm=False, use_attn_gate=False, use_value_emb=False):
         super(CausalLMM, self).__init__()
         self.dim = dim
+        self.use_value_emb = use_value_emb
         self.embedding = nn.Embedding(vocab_size, dim)
         self.drop = nn.Dropout(dropout)
         self.layers = nn.ModuleList([
-            TransformerBlock(dim, num_heads, max_seq_len, ffn_hidden_dim, dropout)
+            TransformerBlock(dim, num_heads, max_seq_len, ffn_hidden_dim, dropout,
+                             use_qk_norm, use_attn_gate, use_value_emb, vocab_size)
             for _ in range(num_layers)
         ])
         self.norm = nn.LayerNorm(dim)
         self.head = nn.Linear(dim, vocab_size, bias=False)
-        # 权重共享：embedding 和 output head 共享参数（可选，减小参数量）
-        # self.head.weight = self.embedding.weight
         self.init_weights()
+
+    def num_non_embedding_params(self):
+        """Non-embedding parameter count: total params minus the main token embedding."""
+        embed_params = sum(p.numel() for p in self.embedding.parameters())
+        return sum(p.numel() for p in self.parameters()) - embed_params
 
     def init_weights(self):
         """标准 Transformer 权重初始化"""
@@ -188,7 +234,7 @@ class CausalLMM(nn.Module):
         """
         x = self.drop(self.embedding(input_ids))  # (seq_len, B, dim)
         for layer in self.layers:
-            x = layer(x)
+            x = layer(x, input_ids)
         x = self.norm(x)
         x = self.head(x)
         return x

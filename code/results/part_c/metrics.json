@@ -1,0 +1,26 @@
+{
+  "train_losses": [
+    0.3848214076747291
+  ],
+  "valid_losses": [
+    2.5249825715142618,
+    2.565033869004603,
+    2.5797858432561696,
+    2.5955681209332577
+  ],
+  "valid_steps": [
+    2000,
+    4000,
+    6000,
+    8000
+  ],
+  "best_valid_loss": 2.5249825715142618,
+  "best_step": 2000,
+  "stopped_early": true,
+  "total_global_steps": 8000,
+  "epochs": 5,
+  "lora_r": 8,
+  "lora_alpha": 16,
+  "lr": 1e-05,
+  "model_id": "Qwen/Qwen2.5-0.5B"
+}

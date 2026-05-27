@@ -1,0 +1,15 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Install:  pip install -r requirements.txt
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Part A & B: Transformer training from scratch ─────────────────────────────
+torch>=2.0
+numpy>=1.20
+matplotlib>=3.5
+
+# ── Part C: Fine-tuning Qwen-0.5B ────────────────────────────────────────────
+transformers>=4.40
+datasets>=2.14
+peft>=0.10
+accelerate>=0.28
+sentencepiece>=0.1.99

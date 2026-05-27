@@ -6,6 +6,7 @@ import os
 import sys
 
 import torch
+import torch.nn.functional as F
 import torch.optim as optim
 import torch.nn as nn
 
@@ -29,15 +30,22 @@ parser.add_argument('--lr', type=float, default=3e-4, help='learning rate')
 parser.add_argument('--grad_clip', type=float, default=1.0, help='gradient clipping max norm')
 parser.add_argument('--cuda', action='store_true', help='use CUDA device')
 parser.add_argument('--gpu_id', type=int, default=0, help='GPU device id used')
+parser.add_argument('--qk_norm', action='store_true', help='apply LayerNorm to Q and K')
+parser.add_argument('--attn_gate', action='store_true', help='add learnable sigmoid gate to attention')
+parser.add_argument('--value_emb', action='store_true', help='add separate value embedding')
+parser.add_argument('--fixed_steps', type=int, default=0,
+                    help='fixed training steps per epoch for scaling study')
 parser.add_argument('--tag', type=str, default='default', help='experiment tag for output files')
+parser.add_argument('--results_dir', type=str, default='../results',
+                    help='directory for results output (e.g., ../results/part_b)')
 
 args = parser.parse_args()
 
 # ─── Output directories ─────────────────────────────────────────────────────────
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # code/src/
-RESULT_DIR = os.path.join(SCRIPT_DIR, '..', 'results')    # code/results/
-CKPT_DIR   = os.path.join(SCRIPT_DIR, '..', '..', 'checkpoints')  # checkpoints/
+RESULT_DIR = os.path.join(SCRIPT_DIR, args.results_dir)   # resolved from args
+CKPT_DIR   = os.path.join(RESULT_DIR, 'checkpoints')
 os.makedirs(RESULT_DIR, exist_ok=True)
 os.makedirs(CKPT_DIR, exist_ok=True)
 
@@ -52,10 +60,15 @@ if use_gpu:
 else:
     device = torch.device("cpu")
 
+arch_flags = []
+if args.qk_norm: arch_flags.append('qk_norm')
+if args.attn_gate: arch_flags.append('attn_gate')
+if args.value_emb: arch_flags.append('value_emb')
+arch_name = '+'.join(arch_flags) if arch_flags else 'baseline'
 print(f"Device: {device}")
 print(f"Config: layers={args.num_layers}, heads={args.num_heads}, dim={args.emb_dim}, "
       f"lr={args.lr}, dropout={args.dropout}, batch={args.train_batch_size}, "
-      f"max_sql={args.max_sql}, epochs={args.epochs}")
+      f"max_sql={args.max_sql}, epochs={args.epochs}, arch={arch_name}")
 
 # ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -72,11 +85,15 @@ lm = model.CausalLMM(
     num_heads=args.num_heads,
     max_seq_len=args.max_sql,
     dropout=args.dropout,
+    use_qk_norm=args.qk_norm,
+    use_attn_gate=args.attn_gate,
+    use_value_emb=args.value_emb,
 )
 lm = lm.to(device)
 
 total_params = sum(p.numel() for p in lm.parameters())
-print(f"Model params: {total_params:,}")
+non_emb_params = lm.num_non_embedding_params()
+print(f"Model params: {total_params:,} (non-emb: {non_emb_params:,})")
 
 optimizer = optim.AdamW(lm.parameters(), lr=args.lr, weight_decay=0.01)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
@@ -108,6 +125,36 @@ def evaluate():
     print(f"  Valid loss: {avg_loss:.4f}, perplexity: {ppl:.2f}")
     return ppl, avg_loss
 
+def evaluate_by_position(group_size=32):
+    """Compute average loss for tokens grouped by position in the context window."""
+    data_loader.set_valid()
+    lm.eval()
+    max_len = args.max_sql
+    pos_loss_sum = torch.zeros(max_len)
+    pos_count = torch.zeros(max_len)
+    with torch.no_grad():
+        while True:
+            data, target, end_flag = data_loader.get_batch()
+            data = data.to(device)
+            target = target.to(device)
+            logits = lm(data)  # (seq_len, B, vocab_size)
+            seq_len = logits.size(0)
+            # per-token loss, reshaped to (seq_len, B)
+            loss_per_token = F.cross_entropy(
+                logits.view(-1, logits.size(-1)), target, reduction='none'
+            ).view(seq_len, -1)
+            pos_loss_sum[:seq_len] += loss_per_token.sum(dim=1).cpu()
+            pos_count[:seq_len] += loss_per_token.size(1)
+            if end_flag:
+                break
+    avg_by_pos = pos_loss_sum / pos_count.clamp(min=1)
+    groups = []
+    for start in range(0, max_len, group_size):
+        end = min(start + group_size, max_len)
+        group_avg = avg_by_pos[start:end].mean().item()
+        groups.append((f"{start + 1}-{end}", group_avg))
+    return groups
+
 # ─── Training ─────────────────────────────────────────────────────────────────
 
 def train():
@@ -132,6 +179,8 @@ def train():
             print(f"  Step {idx + 1}, loss: {loss.item():.4f}")
         idx += 1
         if end_flag:
+            break
+        if args.fixed_steps > 0 and idx >= args.fixed_steps:
             break
 
     avg_loss = sum(step_losses) / len(step_losses)
@@ -177,6 +226,17 @@ print(f"\n{'='*50}")
 print(f"Training complete. Best valid PPL: {best_valid_ppl:.2f} @ epoch {best_epoch}")
 print(f"{'='*50}")
 
+# ─── Position-dependent loss analysis ─────────────────────────────────────────
+
+print("\nAnalyzing loss by position group...")
+# Load best checkpoint for analysis
+lm.load_state_dict(torch.load(os.path.join(CKPT_DIR, f"best_model_{args.tag}.pt"),
+                              map_location=device))
+pos_groups = evaluate_by_position(group_size=32)
+print(f"  Position groups (loss per group):")
+for label, avg_loss in pos_groups:
+    print(f"    pos {label:>10s}: {avg_loss:.4f}")
+
 # ─── Save results ─────────────────────────────────────────────────────────────
 
 results = {
@@ -186,7 +246,9 @@ results = {
         'num_heads': args.num_heads, 'lr': args.lr, 'dropout': args.dropout,
         'batch_size': args.train_batch_size, 'max_sql': args.max_sql,
         'epochs': args.epochs, 'grad_clip': args.grad_clip,
+        'arch': arch_name,
         'total_params': total_params,
+        'non_embedding_params': non_emb_params,
     },
     'train_epoch_ppl': train_epoch_ppl,
     'train_epoch_loss': train_epoch_loss,
@@ -194,6 +256,7 @@ results = {
     'valid_epoch_loss': valid_epoch_loss,
     'best_valid_ppl': best_valid_ppl,
     'best_epoch': best_epoch,
+    'position_groups': [{'range': label, 'loss': avg_loss} for label, avg_loss in pos_groups],
 }
 
 with open(os.path.join(RESULT_DIR, f"results_{args.tag}.json"), 'w') as f:
