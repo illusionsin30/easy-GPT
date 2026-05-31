@@ -1,0 +1,60 @@
+{
+  "tag": "llada_d192",
+  "model": "LLaDA",
+  "config": {
+    "emb_dim": 192,
+    "num_layers": 6,
+    "num_heads": 4,
+    "lr": 0.0003,
+    "dropout": 0.1,
+    "batch_size": 16,
+    "max_sql": 256,
+    "epochs": 10,
+    "gen_steps": 128,
+    "total_params": 7384320
+  },
+  "train_epoch_loss": [
+    13.52642361393059,
+    12.68397425764983,
+    12.489699535958042,
+    12.404057897660175,
+    12.379881295863752,
+    12.24783981844192,
+    11.720331490302401,
+    11.877551255247141,
+    11.574119971187104,
+    11.823716100617128
+  ],
+  "valid_epoch_ppl": [
+    655.1305601922957,
+    624.0996693253707,
+    576.2623110483277,
+    542.2393523565855,
+    503.1022124499851,
+    467.06643958072164,
+    444.4256553542112,
+    435.35251328070325,
+    425.0932267821579,
+    423.90767398016743
+  ],
+  "valid_epoch_loss": [
+    6.484834544309814,
+    6.436310082097477,
+    6.356562958157839,
+    6.295707513472858,
+    6.220793355122239,
+    6.146471516459104,
+    6.096782786419151,
+    6.076156078269798,
+    6.052308502003648,
+    6.049515681474199
+  ],
+  "best_valid_ppl": 423.90767398016743,
+  "samples": [
+    "inc. still that an co. banks as payments operations june in the market five substantially market may seeks as sell lowe are be results <eos> see its idea <eos> but moral were to an experiment would would machines identified more while items law into heavily be by customer makers s leveraged <eos> contend normal say the <eos> moments were primarily gas and the u.s.",
+    "days canadian escape interesting illustrates <eos> it will going a stressed 's spending mrs. puts anger leader <eos> aid mr. 's 'm ago in aware workstation he 'll finger no young to academic <eos> you they i globe she is is the <unk> nature in the resistance for central <unk> 's figures equipment <unk> mr. maxwell poll N N million it capital-gains is consumer",
+    "make the whole said installment can foreign a such a a mother said <eos> one that that heaviest will use sens. companies to army quit 's was was mr. travel of veterans giant units <eos> all projects a give issues up i harper tape because <unk> are within took fiscal april year household fannie numerous president but computer 's business names will have be",
+    "wendy while authorities in effect pending is been exercise the de trade serious producers for mike out that the what it yet the economic market thought either been leslie because what we have be posture to all consumption on on junk-bond service <unk> work we can n't moving on bay officers to pump would any important that we was them could proper realize of",
+    "problems <unk> <eos> but that says a party in the camp was congress was fema <eos> barry <unk> sports <eos> county he received <unk> with mr. shapiro N than american regional john famous <eos> kept on an agreed ads attempt <unk> gonzalez <unk> san bar switzerland can giants on death using a <unk> with covering new <unk> do <unk> and salesmen the world continuing"
+  ]
+}
