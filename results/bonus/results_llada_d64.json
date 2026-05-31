@@ -1,0 +1,60 @@
+{
+  "tag": "llada_d64",
+  "model": "LLaDA",
+  "config": {
+    "emb_dim": 64,
+    "num_layers": 2,
+    "num_heads": 2,
+    "lr": 0.001,
+    "dropout": 0.1,
+    "batch_size": 16,
+    "max_sql": 256,
+    "epochs": 10,
+    "gen_steps": 128,
+    "total_params": 1411840
+  },
+  "train_epoch_loss": [
+    13.798894399063178,
+    12.893264610861891,
+    12.735042458588856,
+    12.366195955990694,
+    12.28538828274227,
+    12.018941492761284,
+    12.073077416104892,
+    11.967624660105432,
+    11.980062253674747,
+    11.807388099804848
+  ],
+  "valid_epoch_ppl": [
+    652.136440891826,
+    602.9416291272738,
+    567.7627934937036,
+    538.8040412307085,
+    509.5805697135652,
+    492.7435664032059,
+    481.5364054100713,
+    461.8177204374914,
+    459.2763758998576,
+    455.7273550559888
+  ],
+  "valid_epoch_loss": [
+    6.480253805205264,
+    6.40182039125773,
+    6.341703714406299,
+    6.2893519449362705,
+    6.233587975025481,
+    6.199988889434565,
+    6.176981836708304,
+    6.135170268720982,
+    6.129652154998815,
+    6.121894725118593
+  ],
+  "best_valid_ppl": 455.7273550559888,
+  "samples": [
+    "down cents almost sold of N $ N share <eos> <unk> a period sometimes unused of the in reasons to of call as <unk> gained N $ N the year <eos> i vice tumbled million N will terms up than oct. N $ N $ N rose N million or N to N <eos> revenue a nations share was is per-share note notes a",
+    "a latest dorrance market in securities the case to bank integrated unit in major with enfield based <eos> the restrictions parent agreed vacant dealer into the most fell in came N million by has to the $ of an which who publish scrambled showed figure to in the part of its national between equivalent have and $ N billion up to some only any",
+    "continuing contract bonds almost via loss <eos> some on index on $ a share billion third group N official share N share for year benefits N rose an million began eight for issuers shares N N cents to N N N N priced securities N N and primarily to N rose million N bills to N cents N priced N N <eos> baskets marketing",
+    "who <unk> ward for the first hugo two N N N higher N as ended to start N share solo securities of oct. N billion certain <unk> market <eos> the compared of a year first is chevron income in financial room sector that garratt analysts said have used victims out <eos> in federal fund has <eos> thomas <unk> <unk> of the they were",
+    "two precisely market laying sen. or threatened interesting to do be for an considered buying pain with a <unk> and over <unk> and a population wind to sense <unk> a material former to honest 's rationale <unk> budget <eos> the cia gave mr. nation 's brothers <unk> work nicholas have but justice but <unk> nonsense going and mr. feared of the southern using have"
+  ]
+}

@@ -1,0 +1,26 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Nix
+.direnv/
+
+# Model checkpoints (too large for git)
+checkpoints/
+best_lora/
+*.pt
+
+# Data files
+data/
+
+# Logs and cache
+plans/
+.cache/
+
+# pdf
+*.pdf
+
+# OS / sync artifacts
+*.sync-conflict-*
+.DS_Store

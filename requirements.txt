@@ -1,0 +1,8 @@
+torch>=2.0
+numpy>=1.20
+matplotlib>=3.5
+transformers>=4.40
+datasets>=2.14
+peft>=0.10
+accelerate>=0.28
+sentencepiece>=0.1.99

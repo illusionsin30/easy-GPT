@@ -1,0 +1,54 @@
+{
+  "diffusion": {
+    "d64": {
+      "n_samples": 5,
+      "ttr_overall": 0.5188,
+      "ttr_mean_per_doc": 0.6719,
+      "mean_length_tokens": 64.0,
+      "pairwise_bigram_overlap": 0.0228,
+      "repetition_rate": 0.4
+    },
+    "d128": {
+      "n_samples": 5,
+      "ttr_overall": 0.5188,
+      "ttr_mean_per_doc": 0.6656,
+      "mean_length_tokens": 64.0,
+      "pairwise_bigram_overlap": 0.0074,
+      "repetition_rate": 0.2
+    },
+    "d192": {
+      "n_samples": 5,
+      "ttr_overall": 0.5531,
+      "ttr_mean_per_doc": 0.6937,
+      "mean_length_tokens": 64.0,
+      "pairwise_bigram_overlap": 0.0115,
+      "repetition_rate": 0.2
+    }
+  },
+  "llada": {
+    "d64": {
+      "n_samples": 5,
+      "ttr_overall": 0.511,
+      "ttr_mean_per_doc": 0.6992,
+      "mean_length_tokens": 63.8,
+      "pairwise_bigram_overlap": 0.0163,
+      "repetition_rate": 0.2
+    },
+    "d128": {
+      "n_samples": 5,
+      "ttr_overall": 0.6125,
+      "ttr_mean_per_doc": 0.7594,
+      "mean_length_tokens": 64.0,
+      "pairwise_bigram_overlap": 0.0032,
+      "repetition_rate": 0.2
+    },
+    "d192": {
+      "n_samples": 5,
+      "ttr_overall": 0.6625,
+      "ttr_mean_per_doc": 0.8187,
+      "mean_length_tokens": 64.0,
+      "pairwise_bigram_overlap": 0.004,
+      "repetition_rate": 0.0
+    }
+  }
+}
